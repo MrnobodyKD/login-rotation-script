@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MT5 Monitor - Dashboard</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: #0f1923;
+            color: #e0e0e0;
+            padding: 20px;
+            font-size: 13px;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding: 14px 20px;
+            background: #1a2733;
+            border-radius: 10px;
+            border: 1px solid #2a3a4a;
+        }
+        .header h1 { font-size: 19px; font-weight: 500; color: #4a9eff; }
+        .header-right { display: flex; align-items: center; gap: 16px; }
+        .header-right span { color: #8a9aaa; font-size: 12px; }
+        .header a { color: #ff6b6b; text-decoration: none; font-size: 13px; }
+        .header a:hover { text-decoration: underline; }
+
+        .add-form {
+            background: #1a2733;
+            padding: 16px 18px;
+            border-radius: 10px;
+            margin-bottom: 18px;
+            border: 1px solid #2a3a4a;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: flex-end;
+        }
+        .add-form input {
+            padding: 8px 12px;
+            background: #0f1923;
+            border: 1px solid #2a3a4a;
+            border-radius: 5px;
+            color: #e0e0e0;
+            font-size: 12px;
+            outline: none;
+            min-width: 110px;
+            flex: 1;
+        }
+        .add-form input:focus { border-color: #4a9eff; }
+        .add-form button {
+            padding: 8px 18px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 12px;
+            white-space: nowrap;
+        }
+        .add-form button:hover { background: #43A047; }
+
+        .table-wrapper {
+            overflow-x: auto;
+            background: #1a2733;
+            border-radius: 10px;
+            border: 1px solid #2a3a4a;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 1000px;
+        }
+        th {
+            background: #243447;
+            padding: 12px 10px;
+            text-align: left;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #8a9aaa;
+            white-space: nowrap;
+        }
+        td {
+            padding: 10px;
+            font-size: 12px;
+            border-top: 1px solid #2a3a4a;
+            white-space: nowrap;
+        }
+        tr:hover td { background: rgba(74, 158, 255, 0.03); }
+
+        .copyable {
+            cursor: pointer;
+            position: relative;
+            transition: background 0.15s;
+            border-radius: 3px;
+            padding: 2px 4px;
+            margin: -2px -4px;
+        }
+        .copyable:hover { background: rgba(74, 158, 255, 0.15); }
+        .copyable:active { background: rgba(74, 158, 255, 0.3); }
+
+        .copied-tooltip {
+            position: fixed;
+            background: #4CAF50;
+            color: white;
+            padding: 6px 14px;
+            border-radius: 6px;
+            font-size: 12px;
+            pointer-events: none;
+            z-index: 9999;
+            animation: fadeOut 1.2s forwards;
+        }
+        @keyframes fadeOut {
+            0% { opacity: 1; }
+            70% { opacity: 1; }
+            100% { opacity: 0; }
+        }
+
+        .status-active { color: #4CAF50; font-weight: 600; }
+        .status-stopped { color: #ff9800; font-weight: 600; }
+        .result-ok { color: #4CAF50; }
+        .result-fail { color: #ff6b6b; }
+
+        .btn {
+            padding: 5px 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 11px;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+        .btn-stop { background: #ff9800; color: #000; }
+        .btn-start { background: #4CAF50; color: white; }
+        .btn-delete { background: #f44336; color: white; }
+        .btn:hover { opacity: 0.85; }
+
+        .no-data { text-align: center; padding: 40px; color: #8a9aaa; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🔍 MT5 Monitor Dashboard</h1>
+        <div class="header-right">
+            <span>🕐 IST Time</span>
+            <a href="/logout">Logout</a>
+        </div>
+    </div>
+
+    <div class="add-form">
+        <input type="text" id="mt5_login" placeholder="MT5 Login">
+        <input type="text" id="mt5_password" placeholder="MT5 Password">
+        <input type="text" id="mt5_server" placeholder="MT5 Server">
+        <input type="text" id="challenge_id" placeholder="Challenge ID">
+        <input type="text" id="challenge_token" placeholder="Challenge Token">
+        <button onclick="addCredential()">+ Add</button>
+    </div>
+
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>MT5 Login</th>
+                    <th>Password</th>
+                    <th>Server</th>
+                    <th>Challenge ID</th>
+                    <th>Status</th>
+                    <th>Last Fetched (IST)</th>
+                    <th>Last Result</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="table-body">
+                {% if credentials %}
+                    {% for c in credentials %}
+                    <tr id="row-{{ c[0] }}">
+                        <td><span class="copyable" onclick="copyText(this, '{{ c[1] }}')">{{ c[1] }}</span></td>
+                        <td><span class="copyable" onclick="copyText(this, '********')" title="Click to copy password">••••••••</span></td>
+                        <td><span class="copyable" onclick="copyText(this, '{{ c[2] }}')">{{ c[2] }}</span></td>
+                        <td><span class="copyable" onclick="copyText(this, '{{ c[3] }}')">{{ c[3] }}</span></td>
+                        <td>
+                            <span class="{% if c[4] == 'active' %}status-active{% else %}status-stopped{% endif %}">
+                                {{ c[4] }}
+                            </span>
+                        </td>
+                        <td>{{ c[5] or 'Never' }}</td>
+                        <td>
+                            {% if c[6] %}
+                                {% if 'SUCCESS' in c[6] or 'OK' in c[6] %}
+                                    <span class="result-ok">{{ c[6] }}</span>
+                                {% else %}
+                                    <span class="result-fail">{{ c[6] }}</span>
+                                {% endif %}
+                            {% else %}
+                                <span style="color:#8a9aaa;">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if c[4] == 'active' %}
+                                <button class="btn btn-stop" onclick="toggleStatus({{ c[0] }}, 'stopped')">⏸ Stop</button>
+                            {% else %}
+                                <button class="btn btn-start" onclick="toggleStatus({{ c[0] }}, 'active')">▶ Start</button>
+                            {% endif %}
+                            <button class="btn btn-delete" onclick="deleteCredential({{ c[0] }})">✕ Del</button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr><td colspan="8" class="no-data">No credentials added yet.</td></tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        // ===== COPY TO CLIPBOARD =====
+        function copyText(el, text) {
+            // For password fields, we need the actual password from data attribute
+            // We'll store passwords in a JS map (loaded from the server)
+            const actualText = el.getAttribute('data-copy') || text;
+            navigator.clipboard.writeText(actualText).then(() => {
+                showCopiedTooltip(el);
+            }).catch(() => {
+                // Fallback
+                const ta = document.createElement('textarea');
+                ta.value = actualText;
+                ta.style.position = 'fixed';
+                ta.style.left = '-9999px';
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+                showCopiedTooltip(el);
+            });
+        }
+
+        function showCopiedTooltip(el) {
+            const rect = el.getBoundingClientRect();
+            const tooltip = document.createElement('div');
+            tooltip.className = 'copied-tooltip';
+            tooltip.textContent = '✓ Copied!';
+            tooltip.style.left = rect.left + 'px';
+            tooltip.style.top = (rect.top - 32) + 'px';
+            document.body.appendChild(tooltip);
+            setTimeout(() => tooltip.remove(), 1300);
+        }
+
+        // ===== ADD CREDENTIAL =====
+        function addCredential() {
+            const data = {
+                mt5_login: document.getElementById('mt5_login').value.trim(),
+                mt5_password: document.getElementById('mt5_password').value.trim(),
+                mt5_server: document.getElementById('mt5_server').value.trim(),
+                challenge_id: document.getElementById('challenge_id').value.trim(),
+                challenge_token: document.getElementById('challenge_token').value.trim()
+            };
+
+            if (!data.mt5_login || !data.mt5_password || !data.mt5_server || !data.challenge_id || !data.challenge_token) {
+                alert('All fields are required');
+                return;
+            }
+
+            fetch('/api/add_credential', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            }).then(r => r.json()).then(res => {
+                if (res.status === 'ok') location.reload();
+                else alert('Failed to add');
+            });
+        }
+
+        // ===== TOGGLE STATUS =====
+        function toggleStatus(id, status) {
+            fetch('/api/toggle_status', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: id, status: status })
+            }).then(r => r.json()).then(res => {
+                if (res.status === 'ok') location.reload();
+            });
+        }
+
+        // ===== DELETE =====
+        function deleteCredential(id) {
+            if (!confirm('Delete this credential permanently? This cannot be undone.')) return;
+            fetch('/api/delete_credential', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: id })
+            }).then(r => r.json()).then(res => {
+                if (res.status === 'ok') location.reload();
+            });
+        }
+
+        // ===== AUTO REFRESH EVERY 30s =====
+        setInterval(() => location.reload(), 30000);
+    </script>
+</body>
+</html>
